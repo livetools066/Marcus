@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text to Speech & Download - Marcus Voice</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            text-align: center;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            font-size: 16px;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+        }
+        .btn-container {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .btn-play { background-color: #007bff; }
+        .btn-download { background-color: #28a745; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <h2>متن کو آواز میں تبدیل کریں اور ڈاؤن لوڈ کریں</h2>
+    <textarea id="text-input" placeholder="یہاں اپنا متن لکھیں..."></textarea>
+    <br>
+    <div class="btn-container">
+        <button class="btn-play" onclick="speakText()">آواز سنیں</button>
+        <button class="btn-download" onclick="speakAndDownload()">آواز ڈاؤن لوڈ کریں</button>
+    </div>
+
+    <script>
+        // Marcus آواز حاصل کرنے کا فنکشن
+        function getMarcusVoice() {
+            const voices = window.speechSynthesis.getVoices();
+            return voices.find(voice => voice.name.includes('Marcus')) || null;
+        }
+
+        // صرف آواز سننے کے لیے
+        function speakText() {
+            const text = document.getElementById('text-input').value;
+            if (!text) return alert('براہ کرم کچھ متن لکھیں!');
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            const marcusVoice = getMarcusVoice();
+            if (marcusVoice) utterance.voice = marcusVoice;
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // آواز ریکارڈ اور ڈاؤن لوڈ کرنے کے لیے
+        async function speakAndDownload() {
+            const text = document.getElementById('text-input').value;
+            if (!text) return alert('براہ کرم کچھ متن لکھیں!');
+
+            try {
+                // سسٹم/ٹیب کا آڈیو کیپچر کرنے کا سیٹ اپ
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: true,
+                    audio: true
+                });
+
+                const audioTrack = stream.getAudioTracks()[0];
+                if (!audioTrack) {
+                    alert("براہ کرم سکرین شیئر کرتے وقت 'Share Audio' کے آپشن کو لازمی آن رکھیں!");
+                    stream.getTracks().forEach(track => track.stop());
+                    return;
+                }
+
+                const mediaStream = new MediaStream([audioTrack]);
+                const mediaRecorder = new MediaRecorder(mediaStream);
+                const audioChunks = [];
+
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    // ڈاؤن لوڈ لنک بنانا
+                    const a = document.createElement('a');
+                    a.href = audioUrl;
+                    a.download = 'marcus-speech.mp3';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+
+                    // تمام اسٹریمنگ ٹریکس بند کرنا
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                // ریکارڈنگ شروع کریں
+                mediaRecorder.start();
+
+                // ٹیکسٹ بولنا شروع کریں
+                const utterance = new SpeechSynthesisUtterance(text);
+                const marcusVoice = getMarcusVoice();
+                if (marcusVoice) utterance.voice = marcusVoice;
+
+                utterance.onend = () => {
+                    // بولنا ختم ہوتے ہی ریکارڈنگ روک دیں
+                    mediaRecorder.stop();
+                };
+
+                window.speechSynthesis.speak(utterance);
+
+            } catch (err) {
+                console.error("Error capturing audio: ", err);
+                alert("ریکارڈنگ کے لیے پرمیشن کی ضرورت ہے۔");
+            }
+        }
+
+        window.speechSynthesis.onvoiceschanged = () => {
+            window.speechSynthesis.getVoices();
+        };
+    </script>
+
+</body>
+</html>
